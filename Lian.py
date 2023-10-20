@@ -3,12 +3,20 @@ import cv2 as cv
 
 from point import Point
 
+def in__(value, arrTuple):
+
+    for point in arrTuple:
+        if value == point[0]:
+            return True
+        
+    return False
+
 def angle_between_vectors(a1, a2, b1, b2):
 
-    ax = a2.x - a1.x
-    ay = a2.y - a1.y 
-    bx = b2.x - b1.x
-    by = b2.y - b1.y
+    ax = abs(a2.x - a1.x)
+    ay = abs(a2.y - a1.y )
+    bx = abs(b2.x - b1.x)
+    by = abs(b2.y - b1.y)
 
     ab = ax*bx + ay*by
     a = a1.dist_to(a2)
@@ -21,29 +29,55 @@ def angle_between_vectors(a1, a2, b1, b2):
         # print(f"angle = {math.acos(cos)*180/math.pi}")
         return math.acos(cos)*180/math.pi
 
-# def angle_between_vectors(a1, a2, b1, b2):
+def angle_between_vectors2(a1, a2, b1, b2):
 
-#     ax = a2.x - a1.x
-#     ay = a2.y - a1.y 
-#     bx = b2.x - b1.x
-#     by = b2.y - b1.y
+    ax = abs(a2.x - a1.x)
+    ay = abs(a2.y - a1.y )
+    bx = abs(b2.x - b1.x)
+    by = abs(b2.y - b1.y)
 
-#     normA = (ax ** 2 + ay ** 2) ** 0.5
-#     normB = (bx ** 2 + by ** 2) ** 0.5
+    normA = (ax ** 2 + ay ** 2) ** 0.5
+    normB = (bx ** 2 + by ** 2) ** 0.5
 
-#     ax = ax / normA
-#     ay = ay / normA
-#     bx = bx / normB
-#     by = by / normB
+    ax = ax / normA
+    ay = ay / normA
+    bx = bx / normB
+    by = by / normB
 
-#     print(ax*bx + ay*by)
+    # print(ax*bx + ay*by)
 
-#     res = round(ax*bx + ay*by, 5)
-#     res = math.asin(res) * 180 /math.pi
+    res = round(ax*bx + ay*by, 5)
+    res = math.acos(res) * 180 /math.pi
     
-#     print(f"angle = {res}")
-#     assert(res<181)
-#     return res
+    # print(f"angle = {res}")
+    assert(res<181)
+    return res
+
+def angle_between_vectors3(a1, a2, b1, b2):
+
+    ax = a2.x - a1.x
+    ay = a2.y - a1.y
+    bx = b2.x - b1.x
+    by = b2.y - b1.y
+
+    angle = math.atan2(by, bx) - math.atan2(ay, ax)
+    # if (angle < 0):
+    #     angle += 2 * math.pi
+
+    return abs(angle * 180 /math.pi)
+
+def angle_between_vectors4(a1, a2, b1, b2):
+
+    ax = abs(a2.x - a1.x)
+    ay = abs(a2.y - a1.y )
+    bx = abs(b2.x - b1.x)
+    by = abs(b2.y - b1.y)
+
+    inner_product = ax * bx + ay * by
+    len1 = math.hypot(ax, ay)
+    len2 = math.hypot(bx, by)
+
+    return math.acos(inner_product/(len1*len2)) * 180 /math.pi
 
 def line_of_sight(a, b, image):
 
@@ -88,7 +122,7 @@ def Expand(a, delta, goal, a_m, bp, g, CLOSED, image):
     for point in points:
         if not point.is_empty(image):
             continue
-        if bp[(a.x, a.y)] != None and abs(angle_between_vectors(bp[(a.x, a.y)], a, a, point)) > a_m:
+        if bp[(a.x, a.y)] != None and abs(angle_between_vectors3(bp[(a.x, a.y)], a, a, point)) > a_m:
             continue
         for close_point in CLOSED:
             if point == close_point and bp[(point.x, point.y)] == close_point:
@@ -110,9 +144,9 @@ def midpoint(point: Point, r: int):
     y = 0
     points.append(Point(x + x_centre, y + y_centre))
     if r > 0:
-        points.append(Point(x + x_centre, -y + y_centre))
+        points.append(Point(-x + x_centre, -y + y_centre))
         points.append(Point(y + x_centre, x + y_centre))
-        points.append(Point(-y + x_centre, x + y_centre))
+        points.append(Point(-y + x_centre, -x + y_centre))
 	
     P = 1 - r 
 
@@ -176,15 +210,19 @@ def LIAN(start, end, delta, a_m, image):
 
     current_point = None
 
-    OPEN.append(start)
+    OPEN.append((start, None))  # now and parent
 
     iterCounter = 0
 
     imgMapSteps = image.copy()
     while len(OPEN) > 0:
-        s = sorted(OPEN, key=lambda x: x.priority)
-        a = sorted(OPEN, key=lambda x: x.priority)[0]
+        
+        a = sorted(OPEN, key=lambda x: x[0].priority)[0]
+
         OPEN.remove(a)
+
+        current_point = a[1]
+        a = a[0]
         
         imgMapSteps = cv.circle(imgMapSteps, (a.x, a.y), 2, (127, 127, 127), -1)
 
@@ -192,6 +230,9 @@ def LIAN(start, end, delta, a_m, image):
 
         if a == end:
             print("Path found!")
+            for point in OPEN:   
+                imgMapSteps = cv.circle(imgMapSteps, (point[0].x, point[0].y), 1, (23, 252, 135), -1)
+
             path = unwindingPath(end, bp)
             return path, imgMapSteps
 
@@ -206,10 +247,11 @@ def LIAN(start, end, delta, a_m, image):
 
         # OPEN.extend(Expand(a, delta, end, a_m, bp, g, CLOSE))
         openExtend = Expand(a, delta, end, a_m, bp, g, CLOSE, image)
+
         for point in openExtend:
-            if not point in OPEN:
-                OPEN.append(point)
+            if not in__(point, OPEN):
+                OPEN.append((point, a))
 
-        current_point = a
-
+        # current_point = a
+        
     print("Path not found :(")
